@@ -32,3 +32,5 @@ PONG
 -	IDE: Microsoft Visual Studio 2019 Community edition;
 -	программа запускается в Debug и Release версиях.
 9.	Реализована игра против бота.
+
+https://drive.google.com/file/d/1jHtQI4Q2CEdF4jdGF-6J009gRGF4qf-p/view?usp=sharing 
