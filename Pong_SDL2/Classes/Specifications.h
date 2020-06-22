@@ -42,6 +42,7 @@ namespace DEF_SETT {
 	// Game characteristics
 	constexpr int SPEED_RATIO = 2;
 	constexpr int SCORE_TO_WIN = 3;
+	constexpr int DELAY_UPDATE = 10;
 
 	// Field characteristics
 	constexpr int UPPER_FIELD_EDGE = 8;

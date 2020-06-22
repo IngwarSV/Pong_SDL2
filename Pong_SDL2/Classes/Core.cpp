@@ -177,8 +177,8 @@ void Core::runGame()
 		{
 			
 			deltaTime = timer.timeElapsed(); // time from frame beginning
-			// at least 20 millisecond ~ 50 FPS
-			if (deltaTime > 20)
+			// waiting at least DELAY_UPDATE millisecond
+			if (deltaTime > DELAY_UPDATE)
 				break;
 		}
 

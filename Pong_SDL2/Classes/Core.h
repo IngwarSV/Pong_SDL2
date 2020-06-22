@@ -83,7 +83,7 @@ private:
 	virtual void input();
 
 	/* main game block: */
-	// updating gameData every frame (~48 FPS)
+	// updating gameData every frame 
 	virtual void updateF(int deltaTime);
 
 	//// checking for paddles collisions
@@ -102,7 +102,7 @@ private:
 	int getMeetingPoint();
 	/**/
 
-	// rendering gameScene every frame (~48 FPS)
+	// rendering gameScene every frame
 	void Render();
 
 

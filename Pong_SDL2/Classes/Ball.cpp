@@ -2,9 +2,6 @@
 
 Ball::Ball()
 {
-	_currLocation.x = FIELD_CENTER.x - BALL_WIDTH / 2;
-	_currLocation.y = FIELD_CENTER.y - BALL_HEIGHT / 2;
-	_ballSpeed = BALL_SPEED;
 }
 
 

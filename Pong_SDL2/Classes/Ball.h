@@ -10,9 +10,9 @@ using namespace DEF_SETT;
 class Ball {
 private:
 // attributes
-	Location _currLocation;
+	Location _currLocation{ FIELD_CENTER.x - BALL_WIDTH / 2, FIELD_CENTER.y - BALL_HEIGHT / 2 };
 	Location _speedVector;
-	int _ballSpeed;
+	int _ballSpeed = BALL_SPEED;
 
 public:
 	Ball();
