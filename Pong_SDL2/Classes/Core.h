@@ -18,7 +18,6 @@
 #include "Paddle.h"
 #include "cleanUp.h"
 
-
 using namespace DEF_SETT;
 /*
 Main game class (Meyers Singleton), composites:
