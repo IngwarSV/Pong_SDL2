@@ -72,23 +72,23 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Program Files %28x86%29\MyDevelopment\SDL\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Program Files %28x86%29\MyDevelopment\SDL\lib\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath>res\SDL\include;$(IncludePath)</IncludePath>
+    <LibraryPath>res\SDL\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\Program Files %28x86%29\MyDevelopment\SDL\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Program Files %28x86%29\MyDevelopment\SDL\lib\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath>res\SDL\include;$(IncludePath)</IncludePath>
+    <LibraryPath>res\SDL\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Program Files %28x86%29\MyDevelopment\SDL\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Program Files %28x86%29\MyDevelopment\SDL\lib\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath>res\SDL\include;$(IncludePath)</IncludePath>
+    <LibraryPath>res\SDL\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\Program Files %28x86%29\MyDevelopment\SDL\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Program Files %28x86%29\MyDevelopment\SDL\lib\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath>res\SDL\include;$(IncludePath)</IncludePath>
+    <LibraryPath>res\SDL\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -153,16 +153,23 @@
   <ItemGroup>
     <ClCompile Include="Classes\Ball.cpp" />
     <ClCompile Include="Classes\Core.cpp" />
+    <ClCompile Include="Classes\IMGInit.cpp" />
     <ClCompile Include="Classes\main.cpp" />
+    <ClCompile Include="Classes\MixAudio.cpp" />
     <ClCompile Include="Classes\Paddle.cpp" />
+    <ClCompile Include="Classes\SDLInit.cpp" />
+    <ClCompile Include="Classes\TTFInit.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Classes\Ball.h" />
-    <ClInclude Include="Classes\cleanUp.h" />
     <ClInclude Include="Classes\Core.h" />
+    <ClInclude Include="Classes\IMGInit.h" />
+    <ClInclude Include="Classes\MixAudio.h" />
     <ClInclude Include="Classes\Paddle.h" />
+    <ClInclude Include="Classes\SDLInit.h" />
     <ClInclude Include="Classes\Specifications.h" />
     <ClInclude Include="Classes\Timer.h" />
+    <ClInclude Include="Classes\TTFInit.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -2,6 +2,7 @@
 
 #include <SDL.h> // for SDL_Color
 
+#include <iostream>
 #include <string>
 
 
@@ -26,6 +27,7 @@ struct Location {
 		return this->x != other.x || this->y != other.y;
 	}
 };
+
 
 enum class CollisionType {
 	NONE,

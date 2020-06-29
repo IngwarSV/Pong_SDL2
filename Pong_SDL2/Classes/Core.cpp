@@ -1,160 +1,78 @@
 #include "Core.h"
 
-Core::~Core()
+template<typename Creator, typename... Arguments>
+auto make_resource(Creator c, Arguments&&... args)
 {
-	cleanUp(_paddleHitSound, _wallHitSound, _goalSound, _infoLabelTexture1, _infoLabelTexture2, _FPSTexture, _scoreAITexture,
-		_scorePlTexture, _ballTexture, _paddlePlTexture, _paddleAITexture, _font, _fontFPS, _renderer, _window);
-	Mix_CloseAudio();
-	TTF_Quit();
-	IMG_Quit();
-	SDL_Quit();
+	auto r = c(std::forward<Arguments>(args)...);
+	if (!r) { 
+		throw std::system_error(errno, std::generic_category()); 
+		//throw std::runtime_error("Can't create something");
+	}
+	std::cout << typeid(r).name() << " ctor was called" << std::endl;
+	return std::unique_ptr<std::decay_t<decltype(*r)>>(r);
 }
 
-Core* Core::sharedCore()
-{
-	static bool s_firstRun = true;
-	static Core s_sharedCore;
 
-	if (s_firstRun) {
-		if (s_sharedCore.init()) {
-			s_firstRun = false;
-			return &s_sharedCore;
-		}
-		else {
-			return nullptr;
-		}
-	}
+Core::Core() {
+	std::cout << "Core ctor began its work" << std::endl;
 
-	return &s_sharedCore;
-}
+	// SDL library and its sublibraries initialization
+	sdlInit = std::make_unique<SDLInit>(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+	imgInit = std::make_unique<IMGInit>(IMG_INIT_PNG);
+	ttfInit = std::make_unique<TTFInit>();
+	audioInit = std::make_unique<MixAudio>(44100, MIX_DEFAULT_FORMAT, 2, 2048);
+	
+	// window and renderer
+	_window = make_resource(SDL_CreateWindow, "Pong", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+		DEF_SETT::SCREEN_WIDTH, DEF_SETT::SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+	_renderer = make_resource(SDL_CreateRenderer, _window.get(), -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+	
+	// Loading fonts
+	_font = make_resource(TTF_OpenFont, FONT_FILE.c_str(), FONT_SIZE);
+	_fontFPS = make_resource(TTF_OpenFont, FONT_FILE.c_str(), FPS_FONT_SIZE);
 
-bool Core::init() {
-	//Start up SDL and make sure it went ok // 
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
-		logSDLError(std::cout, "SDL_Init");
-
-		return false;
-	}
-	//Start up SDL_image and make sure it went ok
-	if ((IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) != IMG_INIT_PNG)
-	{
-		logSDLError(std::cout, "IMG_Init");
-		SDL_Quit();
-
-		return false;
-	}
-	//Start up SDL_ttf and make sure it went ok
-	if (TTF_Init()) {
-		logSDLError(std::cout, "TTF_Init");
-		IMG_Quit();
-		SDL_Quit();
-		return 1;
-	}
-	//Setup our window and renderer
-	_window = SDL_CreateWindow("Pong", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN); //
-	if (_window == nullptr) {
-		logSDLError(std::cout, "CreateWindow");
-		TTF_Quit();
-		IMG_Quit();
-		SDL_Quit();
-		return false;
-	}
-	// SDL_CreateRenderer
-	_renderer = SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-	if (!_renderer) {
-		logSDLError(std::cout, "CreateRenderer");
-		cleanUp(_window);
-		TTF_Quit();
-		IMG_Quit();
-		SDL_Quit();
-		return false;
-	}
-	// loading textures for main objects
-	_ballTexture = loadTexture("res\\ball.png", _renderer);
-	_paddlePlTexture = loadTexture("res\\paddlePlayer.png", _renderer);
-	_paddleAITexture = loadTexture("res\\paddleAI.png", _renderer);
-
-	if (!_ballTexture || !_paddlePlTexture || !_paddleAITexture) {
-		logSDLError(std::cout, "Creating images' textures");
-		cleanUp(_ballTexture, _paddlePlTexture, _paddleAITexture, _renderer, _window);
-		TTF_Quit();
-		IMG_Quit();
-		SDL_Quit();
-
-		return false;
-	}
-	// preparing fonts
-	_font = TTF_OpenFont(FONT_FILE.c_str(), FONT_SIZE);
-	_fontFPS = TTF_OpenFont(FONT_FILE.c_str(), FPS_FONT_SIZE);
-	if (!_font || !_fontFPS) {
-		logSDLError(std::cout, "OpeningFontFile");
-
-		cleanUp(_ballTexture, _paddlePlTexture, _paddleAITexture, _font, _fontFPS, _renderer, _window);
-		TTF_Quit();
-		IMG_Quit();
-		SDL_Quit();
-
-		return false;
-	}
-	// preparing gameLabels
-	_scorePlTexture = renderText("PL : " + std::to_string(_playerScore), _font, BLUE, FONT_SIZE, _renderer);
-	_scoreAITexture = renderText("AI : " + std::to_string(_AIScore), _font, CHOKOLATE, FONT_SIZE, _renderer);
-	_FPSTexture = renderText("FPS: " + std::to_string(_FPS), _fontFPS, GREY, FPS_FONT_SIZE, _renderer);
-	_infoLabelTexture1 = renderText("<<PONG!!!>>", _font, BLUE, FONT_SIZE, _renderer);
-	_infoLabelTexture2 = renderText("PRESS SPC", _font, CHOKOLATE, FONT_SIZE, _renderer);
-
-	if (!_scorePlTexture || !_scoreAITexture || !_FPSTexture || !_infoLabelTexture1 || !_infoLabelTexture2) {
-		logSDLError(std::cout, "Creating labels' textures");
-		cleanUp(_infoLabelTexture1, _infoLabelTexture2, _FPSTexture, _scoreAITexture, _scorePlTexture, _ballTexture,
-			_paddlePlTexture, _paddleAITexture, _font, _fontFPS, _renderer, _window);
-		TTF_Quit();
-		IMG_Quit();
-		SDL_Quit();
-
-		return false;
-	}
-
-	// Initializing SDL_mixer
-	if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0)
-	{
-		logSDLError(std::cout, "SDL_mixer could not initialize!");
-		cleanUp(_infoLabelTexture1, _infoLabelTexture2, _FPSTexture, _scoreAITexture, _scorePlTexture, _ballTexture,
-			_paddlePlTexture, _paddleAITexture, _font, _fontFPS, _renderer, _window);
-		Mix_CloseAudio();
-		Mix_Quit();
-		TTF_Quit();
-		IMG_Quit();
-		SDL_Quit();
-
-		return false;
-	}
-
+	// Loading textures
+	_ballTexture = make_resource(IMG_LoadTexture, _renderer.get(), "res\\ball.png");
+	_paddlePlTexture = make_resource(IMG_LoadTexture, _renderer.get(), "res\\paddlePlayer.png");
+	_paddleAITexture = make_resource(IMG_LoadTexture, _renderer.get(), "res\\paddleAI.png");
+	
+	_scorePlTexture = make_resource(SDL_CreateTextureFromSurface, _renderer.get(), 
+		(make_resource(TTF_RenderText_Blended, _font.get(), ("PL : " + std::to_string(_playerScore)).c_str(), BLUE)).get());
+	_scoreAITexture = make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+		(make_resource(TTF_RenderText_Blended, _font.get(), ("AI : " + std::to_string(_AIScore)).c_str(), CHOKOLATE)).get());
+	_FPSTexture = make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+		(make_resource(TTF_RenderText_Blended, _fontFPS.get(), ("FPS: " + std::to_string(_FPS)).c_str(), GREY)).get());
+	_infoLabelTexture1 = make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+		(make_resource(TTF_RenderText_Blended, _font.get(), "<<PONG!!!>>", BLUE)).get());
+	_infoLabelTexture2 = make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+		(make_resource(TTF_RenderText_Blended, _font.get(), "PRESS SPC", CHOKOLATE)).get());
+	
 	// Loading sounds
-	_paddleHitSound = Mix_LoadWAV("res\\paddleHitSound.wav");
-	_wallHitSound = Mix_LoadWAV("res\\wallHitSound.wav");
-	_goalSound = Mix_LoadWAV("res\\goalSound.wav");
-
-	if (!_paddleHitSound || !_wallHitSound || !_goalSound)
-	{
-		logSDLError(std::cout, "OpeningSoundsFiles");
-		cleanUp(_paddleHitSound, _wallHitSound, _goalSound, _infoLabelTexture1, _infoLabelTexture2, _FPSTexture, _scoreAITexture,
-			_scorePlTexture, _ballTexture, _paddlePlTexture, _paddleAITexture, _font, _fontFPS, _renderer, _window);
-		Mix_CloseAudio();
-		Mix_Quit();
-		TTF_Quit();
-		IMG_Quit();
-		SDL_Quit();
-
-		return false;
-	}
-
+	_paddleHitSound = make_resource(Mix_LoadWAV_RW, SDL_RWFromFile("res\\paddleHitSound.wav", "rb"), 1);
+	_wallHitSound = make_resource(Mix_LoadWAV_RW, SDL_RWFromFile("res\\wallHitSound.wav", "rb"), 1);
+	_goalSound = make_resource(Mix_LoadWAV_RW, SDL_RWFromFile("res\\goalSound.wav", "rb"), 1);
+		
+		
 	// Initializing other gameData
 	_randomGenerator.seed(time(NULL));
 	_ball = std::make_unique<Ball>();
 	_paddlePl = std::make_unique<Paddle>(Location{ LEFT_FIELD_EDGE - PADDLE_WIDTH, SCREEN_HEIGHT / 2 - PADDLE_HEIGHT / 2 });
 	_paddleAI = std::make_unique<Paddle>(Location{ RIGHT_FIELD_EDGE, SCREEN_HEIGHT / 2 - PADDLE_HEIGHT / 2 });
 
-	return true;
+	std::cout << "Core ctor finished its work" << std::endl;
+}
+
+
+Core::~Core()
+{
+	std::cout << "~Core was called" << std::endl;
+}
+
+Core& Core::sharedCore()
+{
+	static Core s_sharedCore;
+
+	return s_sharedCore;
 }
 
 void Core::runGame()
@@ -187,7 +105,9 @@ void Core::runGame()
 		// updating FPS label every ~ 1 second
 		if (sum >= 1000) 
 		{
-			_FPSTexture = renderText("FPS: " + std::to_string(_FPS), _fontFPS, GREY, FPS_FONT_SIZE, _renderer);
+			_FPSTexture = make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+				(make_resource(TTF_RenderText_Blended, _fontFPS.get(), ("FPS: " + std::to_string(_FPS)).c_str(), GREY)).get());
+
 			_FPS = 0;
 			sum = 0;
 		}
@@ -227,11 +147,16 @@ void Core::input()
 					_ballLaunched = true;
 					_ball->resetBallLocation(FIELD_CENTER.y - BALL_HEIGHT / 2, getRandom(120, 240));
 					// Erasing score in case of restarted game
-					_scorePlTexture = renderText("PL : " + std::to_string(_playerScore), _font, BLUE, FONT_SIZE, _renderer);
-					_scoreAITexture = renderText("AI : " + std::to_string(_AIScore), _font, CHOKOLATE, FONT_SIZE, _renderer);
+					_scorePlTexture = make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+						(make_resource(TTF_RenderText_Blended, _font.get(), ("PL : " + std::to_string(_playerScore)).c_str(), BLUE)).get());
+					_scoreAITexture = make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+						(make_resource(TTF_RenderText_Blended, _font.get(), ("AI : " + std::to_string(_AIScore)).c_str(), CHOKOLATE)).get());
+					
 					// Erasing infoLabels
-					_infoLabelTexture1 = renderText(" ", _font, BLUE, FONT_SIZE, _renderer);
-					_infoLabelTexture2 = renderText(" ", _font, CHOKOLATE, FONT_SIZE, _renderer);
+					_infoLabelTexture1 = make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+						(make_resource(TTF_RenderText_Blended, _font.get(), "<<PONG!!!>>", BLUE)).get());
+					_infoLabelTexture2 = make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+						(make_resource(TTF_RenderText_Blended, _font.get(), "PRESS SPC", CHOKOLATE)).get());
 				}
 				break;
 			case SDLK_ESCAPE:
@@ -288,14 +213,16 @@ void Core::updateF(int deltaTime) {
 		if (ballCoordX > SCREEN_WIDTH) {
 			// updating player's score
 			_playerScore += 1;
-			_scorePlTexture = renderText("PL : " + std::to_string(_playerScore), _font, BLUE, FONT_SIZE, _renderer);
-			Mix_PlayChannel(-1, _goalSound, 0);
+			_scorePlTexture = make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+				(make_resource(TTF_RenderText_Blended, _font.get(), ("PL : " + std::to_string(_playerScore)).c_str(), BLUE)).get());
+			Mix_PlayChannel(-1, _goalSound.get(), 0);
 		}
 		else if (ballCoordX < 0) {
 			// updating AI's score
 			_AIScore += 1;
-			_scoreAITexture = renderText("AI : " + std::to_string(_AIScore), _font, CHOKOLATE, FONT_SIZE, _renderer);
-			Mix_PlayChannel(-1, _goalSound, 0);
+			_scoreAITexture = make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+				(make_resource(TTF_RenderText_Blended, _font.get(), ("AI : " + std::to_string(_AIScore)).c_str(), CHOKOLATE)).get());
+			Mix_PlayChannel(-1, _goalSound.get(), 0);
 		}
 		// reseting paddles hits and reducing speed to initial state
 		s_ballHits = 0;
@@ -307,9 +234,12 @@ void Core::updateF(int deltaTime) {
 			_ball->setLocation(Location{ FIELD_CENTER.x - BALL_WIDTH / 2, FIELD_CENTER.y - BALL_HEIGHT / 2 });
 			_ballLaunched = false;
 			_infoLabelTexture1 = (_playerScore == SCORE_TO_WIN) ?
-				renderText("<PL WINS!!!>", _font, BLUE, FONT_SIZE, _renderer) :
-				renderText("<AI WINS!!!>", _font, CHOKOLATE, FONT_SIZE, _renderer);
-			_infoLabelTexture2 = renderText("PRESS SPC", _font, METALLIC_GOLD, FONT_SIZE, _renderer);
+				make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+					(make_resource(TTF_RenderText_Blended, _font.get(), "<PL WINS!!!>", BLUE)).get()) :
+				make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+					(make_resource(TTF_RenderText_Blended, _font.get(), "<AI WINS!!!>", CHOKOLATE)).get());
+			_infoLabelTexture2 = make_resource(SDL_CreateTextureFromSurface, _renderer.get(),
+				(make_resource(TTF_RenderText_Blended, _font.get(), "PRESS SPC", CHOKOLATE)).get());
 			// reseting score
 			_playerScore = 0;
 			_AIScore = 0;
@@ -419,7 +349,7 @@ void Core::handlePaddleCollision(CollisionType type)
 		break;
 	}
 
-	Mix_PlayChannel(-1, _paddleHitSound, 0);
+	Mix_PlayChannel(-1, _paddleHitSound.get(), 0);
 }
 
 void Core::handleWallCollision()
@@ -429,7 +359,7 @@ void Core::handleWallCollision()
 	if (nextBallCoordY < UPPER_FIELD_EDGE || nextBallCoordY + BALL_HEIGHT > BOTTOM_FIELD_EDGE) {
 		// Changing direction for 90*
 		_ball->changeSpeedVector(Location{ 1, -1 });
-		Mix_PlayChannel(-1, _wallHitSound, 0);
+		Mix_PlayChannel(-1, _wallHitSound.get(), 0);
 	}
 }
 
@@ -502,52 +432,32 @@ void Core::AI_Movement()
 void Core::Render()
 {
 	// Clearing current rendering target with the drawing color
-	SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
-	SDL_RenderClear(_renderer);
+	SDL_SetRenderDrawColor(_renderer.get(), 0, 0, 0, 255);
+	SDL_RenderClear(_renderer.get());
 
 	// Rendering left field in grey
 	SDL_Rect leftField = { LEFT_FIELD_EDGE, UPPER_FIELD_EDGE, FIELD_CENTER.x - LEFT_FIELD_EDGE, BOTTOM_FIELD_EDGE - UPPER_FIELD_EDGE };
-	SDL_SetRenderDrawColor(_renderer, 105, 105, 105, 255);
-	SDL_RenderFillRect(_renderer, &leftField);
+	SDL_SetRenderDrawColor(_renderer.get(), 105, 105, 105, 255);
+	SDL_RenderFillRect(_renderer.get(), &leftField);
 
 	// Rendering right field in dark grey
 	SDL_Rect rightField = { FIELD_CENTER.x, UPPER_FIELD_EDGE, RIGHT_FIELD_EDGE - FIELD_CENTER.x, BOTTOM_FIELD_EDGE - UPPER_FIELD_EDGE };
-	SDL_SetRenderDrawColor(_renderer, 67, 68, 69, 255);
-	SDL_RenderFillRect(_renderer, &rightField);
+	SDL_SetRenderDrawColor(_renderer.get(), 67, 68, 69, 255);
+	SDL_RenderFillRect(_renderer.get(), &rightField);
 
-	renderTexture(_scorePlTexture, _renderer, PL_SCORE_LABEL.x, PL_SCORE_LABEL.y);
-	renderTexture(_scoreAITexture, _renderer, AI_SCORE_LABEL.x, AI_SCORE_LABEL.y);
+	renderTexture(_scorePlTexture.get(), _renderer.get(), PL_SCORE_LABEL.x, PL_SCORE_LABEL.y);
+	renderTexture(_scoreAITexture.get(), _renderer.get(), AI_SCORE_LABEL.x, AI_SCORE_LABEL.y);
 
-	renderTexture(_ballTexture, _renderer, _ball->getLocation().x, _ball->getLocation().y);
-	renderTexture(_paddlePlTexture, _renderer, _paddlePl->getLocation().x, _paddlePl->getLocation().y);
-	renderTexture(_paddleAITexture, _renderer, _paddleAI->getLocation().x, _paddleAI->getLocation().y);
-	renderTexture(_FPSTexture, _renderer, FPS_LABEL.x, FPS_LABEL.y);
-	renderTexture(_infoLabelTexture1, _renderer, INFO_LABEL1.x, INFO_LABEL1.y);
-	renderTexture(_infoLabelTexture2, _renderer, INFO_LABEL2.x, INFO_LABEL2.y);
+	renderTexture(_ballTexture.get(), _renderer.get(), _ball->getLocation().x, _ball->getLocation().y);
+	renderTexture(_paddlePlTexture.get(), _renderer.get(), _paddlePl->getLocation().x, _paddlePl->getLocation().y);
+	renderTexture(_paddleAITexture.get(), _renderer.get(), _paddleAI->getLocation().x, _paddleAI->getLocation().y);
+	renderTexture(_FPSTexture.get(), _renderer.get(), FPS_LABEL.x, FPS_LABEL.y);
+	renderTexture(_infoLabelTexture1.get(), _renderer.get(), INFO_LABEL1.x, INFO_LABEL1.y);
+	renderTexture(_infoLabelTexture2.get(), _renderer.get(), INFO_LABEL2.x, INFO_LABEL2.y);
 
-	SDL_RenderPresent(_renderer);
+	SDL_RenderPresent(_renderer.get());
 }
 
-
-
-/*
- * Log an SDL error with some error message to the output stream 
- * @param os The output stream to write the message too
- * @param msg The error message to write, format will be msg error: SDL_GetError()
- */
-void Core::logSDLError(std::ostream& os, const std::string& msg) {
-	os << msg << " error: " << SDL_GetError() << std::endl;
-}
-
-SDL_Texture* Core::loadTexture(const std::string& file, SDL_Renderer* ren)
-{
-	SDL_Texture* texture = IMG_LoadTexture(ren, file.c_str());
-	if (!texture)
-	{
-		std::cout << SDL_GetError();
-	}
-	return texture;
-}
 
 void Core::renderTexture(SDL_Texture* tex, SDL_Renderer* ren, int x, int y, int w, int h)
 {
@@ -566,28 +476,7 @@ void Core::renderTexture(SDL_Texture* tex, SDL_Renderer* ren, int x, int y)
 	renderTexture(tex, ren, x, y, w, h);
 }
 
-SDL_Texture* Core::renderText(const std::string& message, TTF_Font* font,
-	SDL_Color color, int fontSize, SDL_Renderer* renderer)
-{
-	if (font == nullptr) {
-		logSDLError(std::cout, "TTF_OpenFont");
-		return nullptr;
-	}
-	SDL_Surface* surf = TTF_RenderText_Blended(font, message.c_str(), color);
-	if (surf == nullptr) {
-		TTF_CloseFont(font);
-		logSDLError(std::cout, "TTF_RenderText");
-		return nullptr;
-	}
-	SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surf);
-	if (texture == nullptr) {
-		logSDLError(std::cout, "CreateTexture");
-	}
-	
-	SDL_FreeSurface(surf);
-	
-	return texture;
-}
+
 
 int Core::getRandom(int min, int max)
 {
@@ -597,4 +486,3 @@ int Core::getRandom(int min, int max)
 
 	return uid(_randomGenerator);
 }
-

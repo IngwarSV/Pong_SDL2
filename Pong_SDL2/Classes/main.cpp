@@ -7,10 +7,17 @@
 
 
 int main(int, char**) {
-	Core* core = Core::sharedCore();
+	try {
+		Core& core = Core::sharedCore();
+		core.runGame();
+	}
+	catch (const std::runtime_error& e){
+		std::cout << "Exception: " << e.what() << std::endl;
+		return -1;
+	}
+
+
 	
-	if (core)
-		core->runGame();
 
 	return 0;
 }

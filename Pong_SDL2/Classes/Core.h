@@ -12,6 +12,11 @@
 #include <assert.h>
 #include <memory>
 
+#include "SDLInit.h"
+#include "IMGInit.h"
+#include "TTFInit.h"
+#include "MixAudio.h"
+
 #include "Specifications.h"
 #include "Timer.h"
 #include "Ball.h"
@@ -22,48 +27,107 @@ using namespace DEF_SETT;
 /*
 Main game class (Meyers Singleton), composites:
 - Ball object, Player_Paddle object, AI_Paddle object (wrapped in unique_ptr);
-- all SDL stuff, including SDL_mixer and SDL_ttf objects.
-
-Future improvements:
-- class is too big, needs to be divided into smaller parts (through composition)
-
+- four objects, which were created for SDL library and its sublibraries initialization following RAII idiom.
+- all other SDL objects (wrapped in unique_ptr + std::default_delete).
 */
+
+template<typename Creator, typename... Arguments>
+auto make_resource(Creator c, Arguments&&... args);
+
+// Specialising default deleters for SDL types
+namespace std {
+	template<>
+	struct std::default_delete<SDL_Window> {
+		void operator()(SDL_Window* var) {
+			SDL_DestroyWindow(var);
+			std::cout << "~Window was called" << std::endl;
+		}
+	};
+
+	template<>
+	struct std::default_delete<SDL_Renderer> {
+		void operator()(SDL_Renderer* var) {
+			SDL_DestroyRenderer(var);
+			std::cout << "~Renderer was called" << std::endl;
+		}
+	};
+
+	template<>
+	struct std::default_delete<SDL_Texture> {
+		void operator()(SDL_Texture* var) {
+			SDL_DestroyTexture(var);
+			std::cout << "~Texture was called" << std::endl;
+		}
+	};
+
+	template<>
+	struct std::default_delete<SDL_Surface> {
+		void operator()(SDL_Surface* var) {
+			SDL_FreeSurface(var);
+			std::cout << "~Surface was called" << std::endl;
+		}
+	};
+
+	template<>
+	struct std::default_delete<TTF_Font> {
+		void operator()(TTF_Font* var) {
+			TTF_CloseFont(var);
+			std::cout << "~Font was called" << std::endl;
+		}
+	};
+
+	template<>
+	struct std::default_delete<Mix_Chunk> {
+		void operator()(Mix_Chunk* var) {
+			Mix_FreeChunk(var);
+			std::cout << "~Mix_Chunk was called" << std::endl;
+		}
+	};
+}
+
 class Core
 {
 private:
-	Core() {};
+	Core();
 	Core(const Core& copy) = delete;
 	Core& operator=(const Core& copy) = delete;
 	~Core();
 
 // attributes
-	SDL_Window* _window = nullptr;
-	SDL_Renderer* _renderer = nullptr;
-
+	// SDL libraries
+	std::unique_ptr<SDLInit> sdlInit;
+	std::unique_ptr<IMGInit> imgInit;
+	std::unique_ptr<TTFInit> ttfInit;
+	std::unique_ptr<MixAudio> audioInit;
+	
+	// window and renderer
+	std::unique_ptr<SDL_Window> _window;
+	std::unique_ptr<SDL_Renderer> _renderer;
+	
 	// game objects
 	std::unique_ptr<Ball> _ball;
 	std::unique_ptr<Paddle> _paddlePl;
 	std::unique_ptr<Paddle> _paddleAI;
 	
 	// textures
-	SDL_Texture* _ballTexture = nullptr;
-	SDL_Texture* _paddlePlTexture = nullptr;
-	SDL_Texture* _paddleAITexture = nullptr;
-	SDL_Texture* _scorePlTexture = nullptr;     
-	SDL_Texture* _scoreAITexture = nullptr;
-	SDL_Texture* _FPSTexture = nullptr;
-	SDL_Texture* _infoLabelTexture1 = nullptr;
-	SDL_Texture* _infoLabelTexture2 = nullptr;
+	std::unique_ptr<SDL_Texture> _ballTexture;
+	std::unique_ptr<SDL_Texture> _paddlePlTexture;
+	std::unique_ptr<SDL_Texture> _paddleAITexture;
+	std::unique_ptr<SDL_Texture> _scorePlTexture;
+	std::unique_ptr<SDL_Texture> _scoreAITexture;
+	std::unique_ptr<SDL_Texture> _FPSTexture;
+	std::unique_ptr<SDL_Texture> _infoLabelTexture1;
+	std::unique_ptr<SDL_Texture> _infoLabelTexture2;
 
 	// sounds
-	Mix_Chunk* _paddleHitSound = nullptr;
-	Mix_Chunk* _wallHitSound = nullptr;
-	Mix_Chunk* _goalSound = nullptr;
-
+	std::unique_ptr<Mix_Chunk> _paddleHitSound;
+	std::unique_ptr<Mix_Chunk> _wallHitSound;
+	std::unique_ptr<Mix_Chunk> _goalSound;
+	
 	// fonts for labels
-	TTF_Font* _font = nullptr;
-	TTF_Font* _fontFPS = nullptr;
-
+	std::unique_ptr<TTF_Font> _font;
+	std::unique_ptr<TTF_Font> _fontFPS;
+	
 	// random generator for randomizing ball starting angles etc.
 	std::mt19937 _randomGenerator;
 
@@ -76,8 +140,6 @@ private:
 	bool _ballLaunched = false;
 
 // methods
-	bool init();
-
 	// handling keys input
 	virtual void input();
 
@@ -104,25 +166,17 @@ private:
 	// rendering gameScene every frame
 	void Render();
 
-
 	// service methods
-	void logSDLError(std::ostream& os, const std::string& msg);
-
-	SDL_Texture* loadTexture(const std::string& file, SDL_Renderer* ren);
-
 	void renderTexture(SDL_Texture* tex, SDL_Renderer* ren, int x, int y, int w, int h);
 
 	void renderTexture(SDL_Texture* tex, SDL_Renderer* ren, int x, int y);
-
-	SDL_Texture* renderText(const std::string& message, TTF_Font* font,
-		SDL_Color color, int fontSize, SDL_Renderer* renderer);
 	
 	int getRandom(int min, int max);
 
 public:
 // methods
 	// getting Meyers Singleton for Core
-	static Core* sharedCore();
+	static Core& sharedCore();
 
 	// launching gameLoop
 	void runGame();
